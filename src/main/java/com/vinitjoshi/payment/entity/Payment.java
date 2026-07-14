@@ -56,7 +56,7 @@ public class Payment {
     private Instant updatedAt;
 
     @PrePersist
-    void prePersist() {
+    protected void prePersist() {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
@@ -66,16 +66,24 @@ public class Payment {
         }
 
         if (currency != null) {
-            currency = currency.toUpperCase();
+            currency = currency.trim().toUpperCase();
+        }
+
+        if (transactionReference != null) {
+            transactionReference = transactionReference.trim();
         }
     }
 
     @PreUpdate
-    void preUpdate() {
+    protected void preUpdate() {
         updatedAt = Instant.now();
 
         if (currency != null) {
-            currency = currency.toUpperCase();
+            currency = currency.trim().toUpperCase();
+        }
+
+        if (transactionReference != null) {
+            transactionReference = transactionReference.trim();
         }
     }
 }

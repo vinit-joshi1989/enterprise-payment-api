@@ -7,6 +7,7 @@ import com.vinitjoshi.payment.entity.PaymentStatus;
 import com.vinitjoshi.payment.exception.DuplicatePaymentException;
 import com.vinitjoshi.payment.exception.PaymentNotFoundException;
 import com.vinitjoshi.payment.repository.PaymentRepository;
+import com.vinitjoshi.payment.dto.UpdatePaymentStatusRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,5 +70,27 @@ public class PaymentService {
                 payment.getCreatedAt(),
                 payment.getUpdatedAt()
         );
+    }
+
+    public PaymentResponse updatePaymentStatus(
+            UUID id,
+            UpdatePaymentStatusRequest request) {
+
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new PaymentNotFoundException(id));
+
+        payment.setStatus(request.status());
+
+        Payment updatedPayment = paymentRepository.saveAndFlush(payment);
+
+        return toResponse(updatedPayment);
+    }
+
+    public void deletePayment(UUID id) {
+
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new PaymentNotFoundException(id));
+
+        paymentRepository.delete(payment);
     }
 }
