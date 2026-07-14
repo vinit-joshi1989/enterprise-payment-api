@@ -1,116 +1,477 @@
 # Enterprise Payment API
 
-A backend payment processing REST API built with Java and Spring Boot, demonstrating a clean layered architecture, PostgreSQL persistence, Docker-based local infrastructure, request validation, and centralized exception handling.
+A production-style REST API for managing payments, built with **Java 21**, **Spring Boot**, **PostgreSQL**, **Docker**, and **OpenAPI/Swagger**.
+
+This project demonstrates enterprise backend development practices including layered architecture, input validation, exception handling, database persistence, automated testing, and interactive API documentation.
+
+---
 
 ## Features
 
-- Health check endpoint
-- Create a payment
+- Create a new payment
 - Retrieve a payment by ID
 - Retrieve all payments
-- Duplicate transaction reference validation
+- Update payment status
+- Delete a payment
+- Prevent duplicate transaction references
 - Request validation
 - Centralized exception handling
-- PostgreSQL persistence using Spring Data JPA
-- Docker Compose setup for PostgreSQL
-- UUID-based payment identifiers
-- Automatic creation and update timestamps
+- PostgreSQL database persistence
+- Docker-based local database setup
+- Health check endpoint
+- OpenAPI 3 documentation
+- Interactive Swagger UI
+- Automated service and controller tests
+
+---
 
 ## Tech Stack
 
-- Java
-- Spring Boot
+- Java 21
+- Spring Boot 3
 - Spring Web
 - Spring Data JPA
-- Spring Security
-- Spring Boot Actuator
-- Jakarta Validation
+- Hibernate
 - PostgreSQL 16
-- Docker
-- Docker Compose
+- Docker & Docker Compose
+- Jakarta Bean Validation
+- Spring Security
+- JUnit 5
+- Mockito
+- MockMvc
+- OpenAPI 3 / Swagger UI
 - Maven
 
-## Project Structure
+---
+
+## Architecture
+
+The application follows a layered architecture:
+
+```text
+Controller
+    |
+    v
+Service
+    |
+    v
+Repository
+    |
+    v
+PostgreSQL
+```
+
+### Package Structure
 
 ```text
 src/main/java/com/vinitjoshi/payment
 ├── config
-│   └── SecurityConfig.java
 ├── controller
-│   ├── HealthController.java
-│   └── PaymentController.java
 ├── dto
-│   ├── CreatePaymentRequest.java
-│   └── PaymentResponse.java
 ├── entity
-│   ├── Payment.java
-│   └── PaymentStatus.java
 ├── exception
-│   ├── DuplicatePaymentException.java
-│   ├── GlobalExceptionHandler.java
-│   └── PaymentNotFoundException.java
 ├── repository
-│   └── PaymentRepository.java
 ├── service
-│   └── PaymentService.java
 └── EnterprisePaymentApiApplication.java
 ```
 
-## Prerequisites
+---
 
-Before running the application, make sure the following are installed:
+## API Endpoints
 
-- Java
-- Docker Desktop
-- Git
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/payments` | Create a new payment |
+| `GET` | `/api/payments` | Retrieve all payments |
+| `GET` | `/api/payments/{id}` | Retrieve a payment by ID |
+| `PATCH` | `/api/payments/{id}/status` | Update payment status |
+| `DELETE` | `/api/payments/{id}` | Delete a payment |
+| `GET` | `/api/health` | Check application health |
 
-The project includes the Maven Wrapper, so a separate Maven installation is not required.
+---
 
-## Running PostgreSQL with Docker
+## Payment Statuses
 
-Start PostgreSQL from the project root directory:
+A payment can have one of the following statuses:
+
+```text
+PENDING
+PROCESSING
+COMPLETED
+FAILED
+CANCELLED
+```
+
+New payments are created with the default status:
+
+```text
+PENDING
+```
+
+---
+
+## Create Payment
+
+### Request
+
+```http
+POST /api/payments
+Content-Type: application/json
+```
+
+```json
+{
+  "transactionReference": "TXN-20260714-001",
+  "amount": 125.50,
+  "currency": "EUR",
+  "customerId": "CUST-001",
+  "description": "Test payment"
+}
+```
+
+### Successful Response
+
+```http
+201 Created
+```
+
+```json
+{
+  "id": "3b9e3e41-781f-42d7-8409-3e7f62f2f786",
+  "transactionReference": "TXN-20260714-001",
+  "amount": 125.50,
+  "currency": "EUR",
+  "status": "PENDING",
+  "customerId": "CUST-001",
+  "description": "Test payment",
+  "createdAt": "2026-07-14T12:40:34.381682Z",
+  "updatedAt": "2026-07-14T12:40:34.381682Z"
+}
+```
+
+---
+
+## Get All Payments
+
+### Request
+
+```http
+GET /api/payments
+```
+
+### Successful Response
+
+```http
+200 OK
+```
+
+Returns a list of payments.
+
+---
+
+## Get Payment by ID
+
+### Request
+
+```http
+GET /api/payments/{id}
+```
+
+### Successful Response
+
+```http
+200 OK
+```
+
+If the payment does not exist, the API returns:
+
+```http
+404 Not Found
+```
+
+---
+
+## Update Payment Status
+
+### Request
+
+```http
+PATCH /api/payments/{id}/status
+Content-Type: application/json
+```
+
+```json
+{
+  "status": "COMPLETED"
+}
+```
+
+### Successful Response
+
+```http
+200 OK
+```
+
+The response contains the updated payment.
+
+---
+
+## Delete Payment
+
+### Request
+
+```http
+DELETE /api/payments/{id}
+```
+
+### Successful Response
+
+```http
+200 OK
+```
+
+```json
+{
+  "id": "3b9e3e41-781f-42d7-8409-3e7f62f2f786",
+  "message": "Payment deleted successfully",
+  "timestamp": "2026-07-14T12:45:00Z"
+}
+```
+
+---
+
+## Validation
+
+The API validates incoming payment requests.
+
+Examples include:
+
+- Transaction reference is required
+- Transaction reference has a maximum length of 100 characters
+- Amount must be at least `0.01`
+- Currency must contain exactly three alphabetic characters
+- Customer ID is required
+- Description has a maximum length of 255 characters
+- Payment status is required when updating status
+
+Example validation error:
+
+```json
+{
+  "timestamp": "2026-07-14T12:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Validation failed",
+  "fieldErrors": {
+    "amount": "Amount must be greater than zero"
+  }
+}
+```
+
+---
+
+## Exception Handling
+
+The API provides centralized exception handling using `@RestControllerAdvice`.
+
+### Payment Not Found
+
+```http
+404 Not Found
+```
+
+### Duplicate Transaction Reference
+
+```http
+409 Conflict
+```
+
+Example:
+
+```json
+{
+  "timestamp": "2026-07-14T12:00:00Z",
+  "status": 409,
+  "error": "Conflict",
+  "message": "Payment already exists with transaction reference: TXN-20260714-001"
+}
+```
+
+### Validation Failure
+
+```http
+400 Bad Request
+```
+
+---
+
+## PostgreSQL Database
+
+The application uses PostgreSQL for persistent payment storage.
+
+Default local configuration:
+
+```text
+Database: paymentdb
+Username: paymentuser
+Port: 5432
+```
+
+The PostgreSQL database runs inside Docker, while the Spring Boot application currently runs locally.
+
+---
+
+## Docker Setup
+
+Start PostgreSQL:
 
 ```bash
 docker compose up -d
 ```
 
-Verify that the container is running:
+Check container status:
 
 ```bash
 docker compose ps
 ```
 
-The PostgreSQL container should show a `healthy` status.
+Expected status:
 
-To stop the container:
+```text
+healthy
+```
+
+Stop the container:
+
+```bash
+docker compose stop
+```
+
+Start it again:
+
+```bash
+docker compose start
+```
+
+Stop and remove the container:
 
 ```bash
 docker compose down
 ```
 
-## Database Configuration
+The PostgreSQL data is stored in a named Docker volume:
 
-The application connects to PostgreSQL using the following local development configuration:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/paymentdb
-spring.datasource.username=paymentuser
-spring.datasource.password=paymentpass
+```text
+enterprise-payment-api_postgres_data
 ```
 
-The PostgreSQL database is provisioned using `compose.yaml`.
+The database data persists when the container is stopped or recreated with:
 
-> Note: The credentials in this repository are intended for local development only. Production environments should use environment variables or a secrets management solution.
+```bash
+docker compose down
+```
+
+> Do not use `docker compose down -v` unless you intentionally want to delete the database volume and its stored data.
+
+---
+
+## Inspect the Database
+
+Connect to PostgreSQL inside the Docker container:
+
+```bash
+docker exec -it enterprise-payment-postgres psql -U paymentuser -d paymentdb
+```
+
+List tables:
+
+```sql
+\dt
+```
+
+Query all payments:
+
+```sql
+SELECT * FROM payments;
+```
+
+Query selected fields:
+
+```sql
+SELECT transaction_reference, amount, currency, status
+FROM payments;
+```
+
+Exit PostgreSQL:
+
+```text
+\q
+```
+
+---
+
+## Swagger / OpenAPI Documentation
+
+Interactive API documentation is available through Swagger UI.
+
+### Swagger UI
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+### OpenAPI JSON
+
+```text
+http://localhost:8080/v3/api-docs
+```
+
+Swagger provides interactive documentation for:
+
+- Creating payments
+- Retrieving payments
+- Updating payment status
+- Deleting payments
+- Request validation schemas
+- Response models
+- Payment status values
+
+---
 
 ## Running the Application
 
-### Using Maven Wrapper on Windows
+### Prerequisites
+
+Install:
+
+- Java 21 or compatible JDK
+- Docker Desktop
+- Git
+
+The project includes the Maven Wrapper, so a separate Maven installation is not required.
+
+### 1. Clone the repository
 
 ```bash
-mvnw.cmd spring-boot:run
+git clone <repository-url>
+cd enterprise-payment-api
 ```
 
-### Using Maven Wrapper on Linux or macOS
+### 2. Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+### 3. Run the application
+
+On Windows:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+On Linux or macOS:
 
 ```bash
 ./mvnw spring-boot:run
@@ -122,192 +483,131 @@ The application starts on:
 http://localhost:8080
 ```
 
-## API Endpoints
+---
 
-### Health Check
+## Automated Testing
 
-```http
-GET /api/health
+The project currently contains automated tests covering the service and web/controller layers.
+
+### Service Tests
+
+Service tests use **JUnit 5** and **Mockito** to verify business logic in isolation.
+
+Coverage includes:
+
+- Creating payments
+- Duplicate transaction reference handling
+- Retrieving a payment by ID
+- Payment not found handling
+- Retrieving all payments
+- Updating payment status
+- Updating a non-existent payment
+- Deleting payments
+- Deleting a non-existent payment
+
+### Controller Tests
+
+Controller tests use **MockMvc** to verify the HTTP API layer.
+
+Coverage includes:
+
+- `POST /api/payments`
+- `GET /api/payments`
+- `GET /api/payments/{id}`
+- `PATCH /api/payments/{id}/status`
+- `DELETE /api/payments/{id}`
+- Validation failures
+- Not-found responses
+- Duplicate payment responses
+
+### Run All Tests
+
+On Windows:
+
+```powershell
+.\mvnw.cmd test
 ```
 
-Example response:
+On Linux or macOS:
 
-```json
-{
-  "status": "UP",
-  "timestamp": "2026-07-13T12:03:10.825779700Z",
-  "application": "Enterprise Payment API",
-  "version": "1.0.0"
-}
+```bash
+./mvnw test
+```
+
+Current test result:
+
+```text
+Tests run: 20
+Failures: 0
+Errors: 0
+Skipped: 0
+
+BUILD SUCCESS
 ```
 
 ---
 
-### Create Payment
+## Current Project Capabilities
 
-```http
-POST /api/payments
-```
+The application currently demonstrates:
 
-Example request:
-
-```json
-{
-  "transactionReference": "TXN-20260713-001",
-  "amount": 125.50,
-  "currency": "EUR",
-  "customerId": "CUST-001",
-  "description": "Test payment"
-}
-```
-
-Example response:
-
-```json
-{
-  "id": "3b9e3e41-781f-42d7-8409-3e7f62f2f786",
-  "transactionReference": "TXN-20260713-001",
-  "amount": 125.50,
-  "currency": "EUR",
-  "status": "PENDING",
-  "customerId": "CUST-001",
-  "description": "Test payment",
-  "createdAt": "2026-07-13T12:40:34.381682Z",
-  "updatedAt": "2026-07-13T12:40:34.381682Z"
-}
-```
-
-Successful requests return:
-
-```text
-201 Created
-```
+- RESTful API design
+- Layered Spring Boot architecture
+- DTO-based API contracts
+- PostgreSQL persistence
+- JPA entity mapping
+- UUID identifiers
+- Transaction management
+- Request validation
+- Global exception handling
+- Duplicate transaction prevention
+- Payment lifecycle status management
+- Docker-based database infrastructure
+- Persistent Docker volumes
+- Service-layer unit testing
+- Controller-layer testing with MockMvc
+- OpenAPI 3 specification generation
+- Interactive Swagger documentation
 
 ---
 
-### Get All Payments
+## Roadmap
 
-```http
-GET /api/payments
-```
+Planned enhancements:
 
-Example response:
-
-```json
-[
-  {
-    "id": "3b9e3e41-781f-42d7-8409-3e7f62f2f786",
-    "transactionReference": "TXN-20260713-001",
-    "amount": 125.50,
-    "currency": "EUR",
-    "status": "PENDING",
-    "customerId": "CUST-001",
-    "description": "Test payment",
-    "createdAt": "2026-07-13T12:40:34.381682Z",
-    "updatedAt": "2026-07-13T12:40:34.381682Z"
-  }
-]
-```
-
----
-
-### Get Payment by ID
-
-```http
-GET /api/payments/{id}
-```
-
-Example:
-
-```text
-GET /api/payments/3b9e3e41-781f-42d7-8409-3e7f62f2f786
-```
-
-Successful requests return:
-
-```text
-200 OK
-```
-
-If the payment does not exist:
-
-```text
-404 Not Found
-```
-
----
-
-## Error Handling
-
-The API provides centralized exception handling for common errors.
-
-### Duplicate Transaction Reference
-
-A transaction reference must be unique.
-
-Attempting to create another payment using an existing transaction reference returns:
-
-```text
-409 Conflict
-```
-
-### Validation Error
-
-Invalid request data returns:
-
-```text
-400 Bad Request
-```
-
-### Payment Not Found
-
-Requesting a payment with an unknown ID returns:
-
-```text
-404 Not Found
-```
-
-## Current Architecture
-
-```text
-Client
-   |
-   v
-REST Controller
-   |
-   v
-Service Layer
-   |
-   v
-Spring Data JPA Repository
-   |
-   v
-PostgreSQL
-   |
-   v
-Docker Container
-```
-
-The application follows a layered architecture to separate API, business logic, and persistence concerns.
-
-## Development Roadmap
-
-Planned enhancements include:
-
-- Payment status update workflow
-- Additional unit and integration tests
-- Testcontainers-based PostgreSQL integration testing
+- Testcontainers-based PostgreSQL integration tests
 - JWT authentication and authorization
-- OpenAPI / Swagger documentation
-- Dockerization of the Spring Boot application
+- Kafka-based payment event publishing
+- Dockerize the Spring Boot application
+- Environment-based configuration and secret management
 - CI/CD pipeline
-- Improved configuration using environment variables
+- Additional integration testing
 - Cloud deployment
+- Observability and monitoring improvements
+
+---
 
 ## Author
 
 **Vinit Joshi**
 
-Senior Java Developer / Technical Lead
+Senior Java / Backend Engineer
 
-Technologies: Java, Spring Boot, Microservices, Kafka, PostgreSQL, Docker, Kubernetes, AWS, and GCP
+Experience with:
+
+- Java
+- Spring Boot
+- Microservices
+- REST APIs
+- Apache Kafka
+- PostgreSQL
+- Docker
+- Kubernetes
+- AWS
+- Google Cloud Platform
+
+---
+
+## License
+
+This project is licensed under the MIT License.
